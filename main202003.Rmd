@@ -12,13 +12,20 @@ source("code/required_libs.R")
 library(stargazer)
 ```
 
+```{r}
+get_data_path <-function(fname) {
+  paste0( "data/202003/", fname)
+}
+```
+
+
 
 ```{r read data, message=FALSE, warning=FALSE}
-t1 <-  read.zoo("ddatD.zoo",  sep=",", FUN=as.Date, format="%Y-%m-%d",  header = TRUE)
+t1 <-  read.zoo(get_data_path("ddatD.zoo"),  sep=",", FUN=as.Date, format="%Y-%m-%d",  header = TRUE)
 ddatD <- as.xts(t1)
 rm(t1)
 
-t2 <-  read.zoo("ddatM.zoo",  sep=",", FUN=as.Date, format="%Y-%m-%d",  header = TRUE)
+t2 <-  read.zoo(get_data_path("ddatM.zoo"),  sep=",", FUN=as.Date, format="%Y-%m-%d",  header = TRUE)
 ddatM <- as.xts(t2)
 rm(t2)
 ```
