@@ -1,0 +1,409 @@
+---
+title: "R001_Add"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Эволюция RUBUSD 
+```{r}
+ggplot( ddatD, aes( x=DCOILBRENTEU, y=RUBUSD))+geom_path()
+
+```
+
+```{r 2003 и далее}
+dt <- d1["2003-01-01/"]
+ggplot( dt, aes( x=DCOILBRENTEU, y=RUBUSD, colour=index(dt)))+geom_path() +scale_x_log10()+scale_y_log10()+scale_colour_gradient(low = "blue", high = "red")
+
+```
+
+
+
+ggplot( dgg, aes( x=MinFin_and_NonrezOFZ_OP/RUBUSD/EX_T_M, y=log(RUBUSD/forecast)))+
+  geom_point(size=3, colour="red")+
+  geom_text(aes(label=substr(index(dgg), 1,7)), hjust="left", size=3, vjust="bottom", colour="red") + 
+  xlim( -0.15, 0.3) +
+  guides(fill=guide_legend(title="Закупки/Продажи")) +
+  ggtitle("Отклонение курса доллара от нефтяной модели vs\nЗакупки/Продажи валюты Минфином и ОФЗ нерезидентами") +
+  labs(x="Нетто операций (Минфин, Нерез.)/Экспорт", y="log(E$/Прогноз по Brent)") +
+  ggthemeparams
+
+
+```{r}
+ggplot( dt, aes( x=log(DCOILBRENTEU), y=log(RUBUSD*CPIAUCNS/RUSCPIALLMINMEI/cpi0), colour=as.Date(index(dt))))+geom_point()+ scale_colour_gradient(low = "blue", high = "red") +geom_abline(intercept = coef(lm2)[1], slope=coef(lm2)[2], label="ED") + geom_smooth()
+
+```
+
+
+```{r}
+with(ddatM["2017-01-01/2018-10-01"], OFZNonResSales/(MinfinPRUB+OFZNonResSales))
+```
+
+```{r}
+ggplot( dtgg, aes( x=date, y=value/MinFin_and_NonrezOFZ_OP, fill=factor(variable)))+
+  geom_bar( stat="identity", position="stack") +
+  guides(fill=guide_legend(title="Закупки/Продажи")) +
+  ggtitle("Доля Минфина и нерезидентов в операциях, млрд. руб") +
+  labs(x="Дата", y="Доля компонентов от суммы") +
+  ggthemeparams
+
+```
+
+```{r Chart: Dev RUBUSD from forecast vs Minfin and Non-res activity}
+
+ggplot( dgg, aes( x=MinFin_and_NonrezOFZ_OP/RUBUSD, y=RUBUSD/forecast))+geom_point(size=3, colour="blue")+geom_text(aes(label=substr(index(dgg), 1,7)), hjust="left", size=3, vjust="bottom", colour="blue") + theme_bw() + xlim( -5, 10)
+#+geom_path()
+
+```
+
+
+
+```{r Chart: Minfin Purchages and Non-res OFZ sales (dollars)}
+dt1 <- ddatM["2012-01-01/2018-09-01"]
+
+dt <- as.data.frame( dt1  )
+dt$date <- index(dt1)
+dt[ is.na(dt) ]  <- 0 
+
+dt <- dt[, c("MinfinPRUB", "OFZNonResSales", "date", "MinFin_and_NonrezOFZ_OP", "RUBUSD", "EX_T_M") ]
+
+dt$MinFin_and_NonrezOFZ_OP <-  dt$MinFin_and_NonrezOFZ_OP / dt$RUBUSD
+dt$MinfinPUSD <- dt$MinfinPRUB / dt$RUBUSD
+dt$OFZNonResSalesUSD <- dt$OFZNonResSales / dt$RUBUSD
+
+dtgg <- melt(dt, id=c("date", "MinFin_and_NonrezOFZ_OP"), measure.vars=c("MinfinPUSD", "OFZNonResSalesUSD") )
+
+ggplot( dtgg, aes( x=date, y=value, fill=factor(variable)))+
+  geom_bar( stat="identity", position="stack") +
+  geom_line(aes(x=date, y=MinFin_and_NonrezOFZ_OP), color="blue", size=1.2) +
+  guides(fill=guide_legend(title="Закупки/Продажи")) +
+  ggtitle("Закупки/Продажи валюты Минфином и ОФЗ нерезидентами, млрд. долл") +
+  labs(x="Дата", y="МинФин+ Продажи нерез. ОФЗ, млрд. долл.") +
+  ggthemeparams
+
+
+```
+
+
+
+```{r Chart: Minfin Purchages and Non-res OFZ sales (share of export), message=FALSE, warning=FALSE}
+dt1 <- ddatM["2012-01-01/2018-09-01"]
+
+dt <- as.data.frame( dt1  )
+dt$date <- index(dt1)
+dt[ is.na(dt) ]  <- 0 
+
+dt <- dt[, c("MinfinPRUB", "OFZNonResSales", "date", "MinFin_and_NonrezOFZ_OP", "RUBUSD", "EX_T_M") ]
+
+dt$MinFin_and_NonrezOFZ_OP_Ex <-  dt$MinFin_and_NonrezOFZ_OP / dt$RUBUSD / dt$EX_T_M 
+dt$MinfinP_Ex <- dt$MinfinPRUB / dt$RUBUSD / dt$EX_T_M
+dt$OFZNonResSales_Ex <- dt$OFZNonResSales / dt$RUBUSD / dt$EX_T_M
+
+dtgg <- melt(dt, id=c("date", "MinFin_and_NonrezOFZ_OP_Ex"), measure.vars=c("MinfinP_Ex", "OFZNonResSales_Ex") )
+
+ggplot( dtgg, aes( x=date, y=value, fill=factor(variable)))+
+  geom_bar( stat="identity", position="stack") +
+  geom_line(aes(x=date, y=MinFin_and_NonrezOFZ_OP_Ex), color="blue", size=1.2) +
+  guides(fill=guide_legend(title="Закупки/Продажи")) +
+  ggtitle("Закупки/Продажи валюты Минфином и ОФЗ нерезидентами, \nкак доли экспорта") +
+  labs(x="Дата", y="МинФин+ Продажи нерез. ОФЗ/Экспорт за месяц") +
+  ggthemeparams
+
+
+```
+
+
+
+
+
+
+
+Нормировка объемов закупок валюты к экспорту дает схожие результаты (к сожалениею во временном ряду нет данных за август).
+
+Если приведенные модели справедливы, то можно ожидать, что сокращение закупок валюты Минфином, даже с учетом возможного продолжения оттока нерезиденктов, может привести к снижению обменного курса до 20% - до уровней ниже 60 руб. В принципе такое сокращение было бы крайне не желательно.
+
+
+
+
+
+
+
+```{r Chart: Dev RUBUSD from forecast vs Minfin and Non-res activity}
+ggplot( dgg, aes( x=MinFin_and_NonrezOFZ_OP/RUBUSD/DCOILBRENTEU, y=log(RUBUSD/forecast)))+geom_point(size=3, colour="blue")+geom_text(aes(label=substr(index(dgg), 1,7)), hjust="left", size=3, vjust="bottom", colour="blue") + theme_bw() + xlim( -0.05, 0.15)
+```
+
+
+
+
+
+
+
+
+
+
+
+```{r Chart: Dev RUBUSD from forecast vs Minfin and Non-res activity}
+gg1 <- ggplot( dgg, aes( x=MinfinPRUB/RUBUSD/EX_T_M, y=RUBUSD/forecast))+ 
+  geom_point(size=3, colour="blue")+
+  geom_text(aes(label=substr(index(dgg), 1,7)), hjust="left", size=3, vjust="bottom", colour="blue") + 
+  geom_abline(slope=coef(lm_usd_op_Minfin)[1], intercept=0, linetype="dashed")+
+  guides(fill=guide_legend(title="Закупки/Продажи")) +
+  ggtitle("Отклонение курса доллара от нефтяной модели vs\nЗакупки/Продажи валюты только") +
+  labs(x="Операции Минфина/Экспорт", y="log(E$/Прогноз по Brent)") +
+  ggthemeparams
+gg1
+```
+
+```{r}
+lm_usd_op_Minfin <- lm( I(log(RUBUSD/forecast)) ~0 + I(MinfinPRUB/RUBUSD/EX_T_M), data=dgg)
+summary(lm_usd_op_Minfin)
+```
+
+
+```{r}
+lm4 <- lm( I(RUBUSD/forecast) ~I(MinFin_and_NonrezOFZ_OP/RUBUSD/ ( coef(lm_b_ex2)[2]* DCOILBRENTEU+coef(lm_b_ex2)[1])), data=dgg["/2018-03-01"])
+summary(lm4)
+```
+
+
+
+```{r Проверка регрессий lm_usd_op_restr}
+plot(lm_usd_op_restr, which=c(1,3:6))
+plot(lm_usd_op_restr, which=2)
+```
+
+
+```{r Диагностика регрессии lm_usd_op_sep}
+plot(lm_usd_op_sep)
+```
+
+```{r Проверка регрессий lm_usd_op_restr}
+plot(lm_usd_op_sep, which=c(1,3:6))
+plot(lm_usd_op_sep, which=2)
+```
+
+
+```{r}
+adf.test(resid(lm_usd_op_sep))
+auto.arima( resid(lm_usd_op_sep))
+```
+
+
+```{r }
+lm4 <- lm( I(RUBUSD/forecast) ~I(MinFin_and_NonrezOFZ_OP/RUBUSD/ ( coef(lm_b_ex2)[2]* DCOILBRENTEU+coef(lm_b_ex2)[1])), data=dgg["/2018-03-01"])
+summary(lm4)
+```
+
+
+```{r Нелинейности - с экcтраполирвоанными данными}
+dgg1 <- dgg
+dgg1$mf1 <- dgg1$MinfinPRUB/dgg1$RUBUSD/dgg1$Ex_Est
+dgg1$mr1 <- dgg1$OFZNonResSales/dgg1$RUBUSD/dgg1$Ex_Est
+
+lm1 <- lm( I(log(RUBUSD/forecast)) ~ 0+ I(mf1) +I(mr1) + I(mf1*mf1)+I(mf1*mr1)+I(mr1*mr1), data=dgg1["/2018-09-01"])
+summary(lm1)
+anova(lm1)
+
+```
+
+
+Влияют ли лаги? (Нет)
+```{r Regression RUBUSD/forecast vs MinfinPRUB and OFZNonResSales separately with lags}
+dgg1 <- dgg
+dgg1$rusdf <- dgg1$RUBUSD/dgg1$forecast
+dgg1$rusdf_1 <- lag( dgg1$rusdf )
+
+dgg1$dofz_rel <- dgg1$OFZNonResSales/dgg1$RUBUSD/dgg1$EX_T_M
+dgg1$dofz_rel_1 <- lag(dgg1$dofz_rel )
+
+dgg1$minfin_rel <- dgg1$MinfinPRUB/dgg1$RUBUSD/dgg1$EX_T_M
+dgg1$minfin_rel_1 <-lag(dgg1$minfin_rel)
+
+
+lm1 <- lm( I(log(rusdf)) ~ 0+ minfin_rel + minfin_rel_1 + dofz_rel + dofz_rel_1 + lag(rusdf), data=dgg1)
+summary(lm1)
+anova(lm1)
+```
+
+
+```{r}
+lm1 <- lm( I(log(rusdf)) ~ 0+ minfin_rel + dofz_rel + lag(rusdf), data=dgg1)
+summary(lm1)
+anova(lm1)
+
+```
+
+
+
+
+Мы не получим осмысленных результатов для модели в дифференциалах - модель long term.
+```{r}
+dgg1 <- dgg
+dgg1$rusdf <- log(dgg1$RUBUSD/dgg1$forecast)
+dgg1$rusdf_1 <- lag( dgg1$rusdf )
+
+dgg1$dofz_rel <- dgg1$OFZNonResSales/dgg1$RUBUSD/dgg1$EX_T_M
+dgg1$dofz_rel_1 <- lag(dgg1$dofz_rel )
+
+dgg1$minfin_rel <- dgg1$MinfinPRUB/dgg1$RUBUSD/dgg1$EX_T_M
+dgg1$minfin_rel_1 <-lag(dgg1$minfin_rel)
+
+lm1 <- lm( I(diff(rusdf)) ~ 0+ diff(minfin_rel) + diff(dofz_rel), data=dgg1)
+summary(lm1)
+anova(lm1)
+```
+
+
+```{r}
+
+lm1 <- lm( I(diff(rusdf)) ~ 0+ diff(minfin_rel +0.6*dofz_rel), data=dgg1)
+summary(lm1)
+anova(lm1)
+```
+
+```{r}
+dgg1$d_op <- diff(dgg1$minfin_rel + 0.6 * dgg1$dofz_rel)
+dgg1$d_rusdf <- diff( diff(dgg1$rusdf))
+ggplot( na.omit(dgg1), aes(x=d_op, y = d_rusdf)) + geom_point()
+```
+
+
+
+### Коинтеграция - слишком много переменных, недостаточно данных
+```{r Cointegration}
+dgg1 <- dgg
+dgg1$rusdf <- log(dgg1$RUBUSD /dgg1$forecast)
+dgg1$dofz_rel <- dgg1$OFZNonResSales/dgg1$RUBUSD/dgg1$EX_T_M
+dgg1$minfin_rel <- dgg1$MinfinPRUB/dgg1$RUBUSD/dgg1$EX_T_M
+dgg1$op_w <- dgg1$minfin_rel + 0.6 * dgg1$dofz_rel
+
+
+d1 <- na.omit( dgg1[, c("rusdf", "op_w")] )
+library(urca)
+ca1 <- ca.jo( as.data.frame(d1),spec="transitory", type="eigen", ecdet="none", K=2  )             
+summary(ca1)
+
+
+```
+Увы, но с имеющейся статистикой (17 точек на 8 свободных параметров) невозможно установить факт наличия коинтеграции даже с 10% уверенностью. С другой стороны коинтеграционный вектор получается со вполне разумными значениями. 
+
+
+
+###VAR-модели
+По сути означает, что курс следует авторегрессионной модели в уровнях - в него заложено 90% предыдущего уровня. Влияние предшествующих закупок валюты минфином не значимо (они влияют через уже сложившийся курс). Опять-таки слишклм много параметров.     
+```{r VAR in levels}
+require(vars)
+
+v1 <- VAR( d1, exogen=NULL, p=1)
+summary(v1)
+
+
+```
+
+
+#### VAR в первых разностях
+```{r VAR in diff}
+v2 <- VAR( na.omit(diff(d1)), exogen=NULL, p=1)
+summary(v2)
+
+```
+
+```{r}
+crb_d2 <- get_cbr_data_ws_daily()
+
+```
+
+
+```{r}
+
+d1 <- na.omit( crb_d2["2018-09-12/2018-09-30", "RUBUSD"] )
+ar1 <- auto.arima( d1 )
+summary(ar1)
+```
+
+
+```{r}
+
+
+
+plot( d1)
+plot(ar1)
+```
+
+
+
+
+
+
+###Диапазон с 2015 года
+
+```{r}
+dgg2 <- ddatM["2015-04-01/2018-10-01"]
+dgg2$RUSCPIALLMINMEI <- na.locf( dgg2$RUSCPIALLMINMEI )
+dgg2$forecast <- exp( coef(lm_usd_brent)[1]+coef(lm_usd_brent)[2]* log(dgg2$DCOILBRENTEU)) / (dgg2$CPIAUCNS/dgg2$RUSCPIALLMINMEI/cpi0)
+
+```
+
+
+
+```{r  Regression RUBUSD/forecast vs Minfin+Non-res activity}
+
+lm_usd_op_dgg2 <- lm( I(log(RUBUSD/forecast)) ~0 + I(MinfinPRUB/RUBUSD/EX_T_M) +I(OFZNonResSales/RUBUSD/EX_T_M), data=dgg2)
+summary(lm_usd_op_dgg2)
+```
+
+```{r}
+ggplot( dgg2, aes( x=(coef(lm_usd_op_dgg2)[1]*MinfinPRUB+coef(lm_usd_op_dgg2)[2]*OFZNonResSales )/RUBUSD/EX_T_M, y=log(RUBUSD/forecast))) +
+  geom_point(size=3, colour="blue")
+  
+  +
+    geom_smooth(method="lm", show.legend=TRUE, level=0.67) +
+  geom_text(aes(label=substr(index(dgg2), 1,7)), hjust="left", size=3, vjust="bottom", colour="blue") +
+  geom_abline(slope=1, intercept=0, linetype="dashed")+
+  guides(fill=guide_legend(title="Закупки/Продажи")) +
+  ggtitle("Отклонение курса доллара от нефтяной модели vs\nЗакупки/Продажи валюты") +
+  labs(x="Операции (взвеш)/Экспорт", y="log(E$/Прогноз по Brent)") +
+  xlim( -0.1, 0.3) +
+  ggthemeparams
+gg1
+```
+
+
+```{r}
+ggplot( dgg2, aes( x=RUBUSD, y=forecast))+ 
+  geom_point(size=3, colour="blue") + 
+    geom_abline(slope=1, intercept=0, linetype="dashed")
+
+```
+
+
+
+```{r}
+ggplot( dgg2, aes( x=as.Date(index(dgg2)), y=log(RUBUSD/forecast)))+ 
+  geom_point(size=3, colour="blue") + 
+    geom_abline(slope=0, intercept=0, linetype="dashed")
+
+```
+
+
+
+
+
+
+
+```{r}
+dgg$r <- 0 
+lag( dgg$r)
+dgg$r[ names(lm_usd_op_sep$residuals ), "r"] <- lm_usd_op_sep$residuals
+dgg$r_1 <- lag(dgg$r)
+update( lm_usd_op_sep,  . ~ . + r_1)
+```
+Коэффициент при r_1 ассимпточески распределен как N(0,1), значение 0.31 вполне согласуется с нулем, значит последовательной корреляции остатков нет.
+
+
+
+
+
