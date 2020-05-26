@@ -1,0 +1,239 @@
+---
+title: "RUBUSD update 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, cache=TRUE)
+```
+
+```{r init, message=FALSE, warning=FALSE}
+source("code/required_libs.R")
+library(stargazer)
+```
+
+```{r}
+get_data_path <-function(fname) {
+  paste0( "data/", fname)
+}
+```
+
+
+
+```{r read data, message=FALSE, warning=FALSE}
+t1 <-  read.zoo(get_data_path("ddatD.zoo"),  sep=",", FUN=as.Date, format="%Y-%m-%d",  header = TRUE)
+ddatD <- as.xts(t1)
+rm(t1)
+
+t2 <-  read.zoo(get_data_path("ddatM.zoo"),  sep=",", FUN=as.Date, format="%Y-%m-%d",  header = TRUE)
+ddatM <- as.xts(t2)
+rm(t2)
+```
+
+
+```{r ggplot theme settings }
+ggthemeparams <-  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(panel.border = element_blank(), axis.line.x = element_line(), axis.line.y = element_line()) +  theme_bw() + theme(legend.position="bottom")
+
+
+ggdate_format <- function(x){
+  format(as.Date( x, origin = '1970-01-01' ), "%Y") }
+  
+stargazer_type <- function() {
+  if( isTRUE(getOption('knitr.in.progress')) ) { 
+   return( "html")
+} else {
+    return( "text" )
+} }
+
+```
+
+```{r}
+dtM <- as.data.table(ddatM) 
+dtD <- as.data.table(ddatD)
+setnames(dtM, "index", "date")
+setnames(dtD, "index", "date")
+```
+
+```{r Extend CPI}
+dtM[ , CPIAUCNS := na.locf(CPIAUCNS) ]
+dtM[ , RUSCPIALLMINMEI := na.locf(RUSCPIALLMINMEI) ]
+
+cpi0 <- dtM[ date == "2002-12-31" ]$CPIAUCNS/dtM[ date == "2002-12-31" ]$RUSCPIALLMINMEI
+
+dtM[ , q := RUBUSD*CPIAUCNS/RUSCPIALLMINMEI/cpi0 ]
+
+# ddatM$q_L1 <- lag(ddatM$q)
+```
+
+
+
+```{r Fit: RUBUSD cpi corrected vs Brent }
+
+dtD[ , CPIAUCNS := NA ]
+
+#check syntax 
+#dtM[ dtD, .(date, CPIAUCNS), on=.(date)]
+
+dtD[ , CPIAUCNS := dtM[ dtD, CPIAUCNS, on=.(date)] ]
+dtD[ , CPIAUCNS := na.locf(CPIAUCNS,na.rm= FALSE) ]
+
+dtD[ , RUSCPIALLMINMEI := NA ]
+dtD[ , RUSCPIALLMINMEI := dtM[ dtD, RUSCPIALLMINMEI, on=.(date)]]
+dtD[ , RUSCPIALLMINMEI := na.locf(RUSCPIALLMINMEI,na.rm= FALSE) ]
+dtD[ , q := RUBUSD*CPIAUCNS/RUSCPIALLMINMEI/cpi0 ]
+```
+
+Коротко. 
+
+
+
+1. После падения нефти в марте 2020 г. обменный курс рубля перестал искажаться закупками валюты в рамках "бюджетного правила", и вернулся на уровень, определяемый долгосрочной моделью из цены нефти и инфляции.  
+
+
+
+```{r}
+dd1 <- dtM[ between( date, "2003-01-01", "2008-07-01") | 
+              between( date, "2009-03-01", "2014-07-01") | 
+              between( date, "2015-03-01", "2017-01-01"), ]
+
+lm1 <- lm( log(q) ~ log(DCOILBRENTEU) , data=dd1)
+lm1
+```
+
+```{r}
+dd2 <- dtM[ between( date, "2003-01-01", "2008-07-01") | 
+              between( date, "2009-03-01", "2014-07-01"), ]
+
+lm2 <- lm( log(q) ~ log(DCOILBRENTEU) , data=dd2)
+lm2
+```
+
+
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+library(readxl)
+latest_oil <- read_excel("latest_oil.xlsx",
+col_types = c("date", "numeric", "text",
+"text", "text", "text", "text"), 
+    col_names = FALSE)
+# View(latest_oil)
+latest_oil <- as.data.table(latest_oil)
+names(latest_oil)[1] <- "date"
+names(latest_oil)[2] <- "Price"
+latest_oil$date <- as.Date(latest_oil$date)
+```
+
+```{r}
+v1 <- latest_oil[ dtD, Price, on=.(date)]
+f1 <- is.na(dtD$DCOILBRENTEU)
+dtD[ f1, DCOILBRENTEU := v1[f1]]
+```
+
+```{r}
+coeff_rubusd_brent_model <- coef(lm1)
+```
+
+```{r}
+dt <- dtM[ between(date, "2003-01-01", "2020-04-01")]
+##model 2003-2016
+
+dt2 <- dtD[ between(date, "2003-01-01", Sys.Date())]
+##model 2003-2016
+
+```
+
+
+```{r}
+dt2[ , Model.USDRUB := exp( coeff_rubusd_brent_model[1] + log(DCOILBRENTEU)* coeff_rubusd_brent_model[2] ) /  (CPIAUCNS/RUSCPIALLMINMEI/cpi0) ]
+
+
+dt2[ , r:= log(q) - (coeff_rubusd_brent_model[1] + coeff_rubusd_brent_model[2]*log(DCOILBRENTEU))]
+
+
+```
+
+
+
+
+```{r message=FALSE, warning=FALSE}
+ggplot( dt2, aes( x=date, y=RUBUSD, colour="RUBUSD")) +
+  geom_path(size=2)+
+  geom_hline( yintercept = 0, linetype="dashed")+
+  geom_point(aes( x=date, y=Model.USDRUB, color="Model"), size=0.5)+
+  ggtitle( "RUBUSD (факт) vs курс, рассчитанный по цене нефти") +
+  labs(y="Курс руб/$", x="Дата") +
+  ylim(20, 100) +
+  ggthemeparams 
+
+```
+
+```{r}
+ggplot( dt2, aes( x=date, y=r, colour="Model.Dev")) +
+  geom_point()+
+  geom_hline( yintercept = 0, linetype="dashed")+
+#  scale_colour_gradient(low = "blue", high = "red",  labels=ggdate_format)+
+#  geom_abline(intercept = coeff_rubusd_brent_model[1], slope=coeff_rubusd_brent_model[2], label="ED2015")+
+#  geom_abline(intercept = coef(lm2017)[1], slope=coef(lm2017)[2], linetype="longdash", colour="red", label="ED2017")+
+#  guides(colour=guide_colourbar(title="Дата")) +
+  ggtitle("Отклонение курса доллара (факт) от модели по цене Brent, 2003-2020 гг.") +
+  labs(y="Отклонение факта от модели", x="Дата") +
+  ggthemeparams 
+
+```
+
+
+2. Оценка цены Brent, необходимой для получения уровней курса, наблюдаемых в 2019-2020 гг, составляет $40-45. Это именно столько, сколько было заложено правительством в бюджетное правило. Иными словами  
+а) правительство очень эффективно управляло уровнем курса все это время.  
+б) нефтяная модель курса продолжала работать, но с эффективным уровнем нефти, заданным правительством.  
+в) При падении цены нефти ниже $40/баррель закупки валюты прекратились, курс отправился в свободное плавание.
+
+
+```{r message=FALSE, warning=FALSE}
+dt2[ , Est.BrentPrice := exp( (log(q) - coeff_rubusd_brent_model[1])/coeff_rubusd_brent_model[2])]
+       
+
+ggplot( dt2, aes( x=date, y=Est.BrentPrice, colour="Est.Brent")) +
+  geom_path(size=2)+
+  geom_hline( yintercept = 0, linetype="dashed")+
+  geom_point(aes( x=date, y=DCOILBRENTEU, color="Brent, $/b"), size=0.5)+
+  ggtitle( "Brent (факт) vs Brent, рассчитанный по курсу доллара") +
+  labs(y="Oil price $/b", x="Дата") +
+  ylim(20, 150) +
+  ggthemeparams 
+
+```
+
+3. Можно оценить уровень курса, который мы можем ожидать при дешевой нефти, при условии, что
+  
+a) центробанк не станет проводить валютные интервенции для компенсации случившихся изменений на рынке.   
+б) на рынке не начнется паника, которая приведет к тому, что курс окажется много больше равновесного значения (выйдет за пределы полос +/-10% на рисунке).   
+
+
+
+
+```{r warning=FALSE}
+dt3 <- data.table( Brent = c(20:100))
+
+dt3[ , USD := exp( coeff_rubusd_brent_model[1] + log(Brent)* coeff_rubusd_brent_model[2] ) / dtD[ date == "2020-03-01", CPIAUCNS/RUSCPIALLMINMEI/cpi0] ]
+
+ggplot( dt3, aes( x=Brent, y=USD, colour="Model.RUBUSD")) +
+  geom_path(size=2)+
+  geom_path(aes(y=1.1*USD), linetype="dotted")+
+  geom_path(aes(y=0.9*USD), linetype="dotted")+
+  ggtitle( "RUBUSD (факт) vs модель на март 2020") +
+  labs(x="Brent $/b", y="Курс, руб/$") +
+  geom_point(data=dt2[date>="2020-03-01"], aes(x=DCOILBRENTEU, y=RUBUSD, colour="RUBUSD"), shape=23, size=3, fill="blue") +
+  xlim(20,60) +
+  ylim(50,100)+
+  ggthemeparams 
+
+```
+
+
+
+
+```{r}
+# save.image( file="data.RData")
+```
+
